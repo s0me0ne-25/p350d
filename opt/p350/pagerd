@@ -984,13 +984,22 @@ def handle_exit(*args):
     isTerminated = True
     
     debug('Received termination command')
-    
-    rx.cancel() # Cancel Virtual Wire receiver.
-    pi.stop() # Disconnect from local Pi.
 
+    # Page the stop message first. On OS shutdown pigpiod may already be
+    # stopped, and then the pigpio calls below raise; that must neither
+    # prevent the message nor abort the rest of the cleanup.
     if not pconf.config[PersistConfig.SILENT_RESTART]:
-        page(datetime.now().strftime("<%H:%M:%S> ") + STOPMSG)
-    
+        try:
+            page(datetime.now().strftime("<%H:%M:%S> ") + STOPMSG)
+        except Exception as e:
+            debug('Failed to page stop message (' + repr(e) + ')')
+
+    try:
+        rx.cancel() # Cancel Virtual Wire receiver.
+        pi.stop() # Disconnect from local Pi.
+    except Exception as e:
+        debug('pigpio cleanup failed (' + repr(e) + ')')
+
     for timer in dispTimers:
         timer.cancel()     
     try:    
@@ -1032,11 +1041,15 @@ for timer in dispTimers:
 threading.Thread(target=serverThread).start()
 debug('Server started')
 
+# Install the handlers before the startup transmission: with silent restart
+# on, sendq() below may run for minutes (RETX_COOLDOWN after every queued
+# message), and a SIGTERM arriving before the handlers are set would kill
+# the daemon without paging the stop message.
+#atexit.register(handle_exit, None)
+signal.signal(signal.SIGTERM, handle_exit)
+signal.signal(signal.SIGINT, handle_exit)
+
 if pconf.config[PersistConfig.SILENT_RESTART]:
     sendq()
 else:
     page(datetime.now().strftime("<%H:%M:%S> ") + STARTMSG)
-
-#atexit.register(handle_exit, None)
-signal.signal(signal.SIGTERM, handle_exit)
-signal.signal(signal.SIGINT, handle_exit)

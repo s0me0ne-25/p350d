@@ -3,6 +3,9 @@ Description=Paging station daemon
 RequiresMountsFor=/
 Wants=time-sync.target
 After=time-sync.target
+# pigpiod must outlive pagerd on shutdown (units stop in reverse order)
+Wants=pigpiod.service
+After=pigpiod.service
 
 [Service]
 Type=simple
