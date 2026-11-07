@@ -1,0 +1,3 @@
+#!/bin/bash
+sudo systemctl restart p350d
+sudo journalctl -fu p350d

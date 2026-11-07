@@ -1,0 +1,9 @@
+# Third-party files are stored byte-for-byte as received from their authors
+# (several of them use CRLF line endings), so never normalize them.
+third_party/** -text
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.deb binary

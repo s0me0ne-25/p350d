@@ -1,0 +1,15 @@
+[Unit]
+Description=Paging station log cacher (%I)
+RequiresMountsFor=/
+After=p350d.service
+
+[Service]
+Type=simple
+ExecStart=/opt/p350/p350-logd %i
+Restart=always
+User=pagerd
+Group=pagerd
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

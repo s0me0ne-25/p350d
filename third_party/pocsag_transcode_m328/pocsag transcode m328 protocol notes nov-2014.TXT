@@ -1,0 +1,487 @@
+pocsag encoder 2014 protocol PRELIMINARY ver 3.xx  Henry Carl Ott N2RVQ hcarlott@gmail.com (c) 2014 All rights reserved.
+
+
+Communication notes:
+All commands 9600 8N1
+All commands must terminate with Carriage Return <CR> hex 0x0d
+Linefeeds <LF> are ignored, but you should avoid sending them if possible.
+Max command line length is limited by input serial RX FIFO. Size is TBD.
+When input RX FIFO size is less than TBD the handshake out signal CTS will de-assert until the RX FIFO size is greater then TBD.  
+All command lines must begin and terminate within a timeout window of TBD. Exceeding this time window will generate a timeout err code.
+    
+	
+NOTE: there are TWO FIFO buffers to be normally concerned with.
+1. The rx serial data FIFO. Receives and holds command strings from the host processor. When almost full will de-assert a handshake line (CTS). 
+If data continues after handshake line de-asserts and overflows RX buffer, the buffer will be flushed. Data will be lost, an error code sent.
+
+2. The pocsag TX FIFO buffer. Holds all pending pocsag and Morse messages that have been successfully parsed from the command processor. 
+The maximum number of pending pages waiting to transmit is determined by the msg length of the pages. In addition to the actual msg payload, there is a 5 byte overhead associated with each message (flags bits, capcode, zero termination).
+If there is no room to enqueue the entire message into TX FIFO, it will be discarded with an error code.
+
+All commands are single letter commands followed by optional arguments and terminated by a <CR>
+NOTE: Commands are not currently case sensitive, but we may need to change that later.
+NOTE: Most commands will reply with status code and <CR>
+NOTE: Some commands reply with <CR> terminated data strings 
+NOTE: If currently transmitting, there may be a maximum delay of one pocsag word (at current baud rate) before command processor runs.
+NOTE: If the command is not recognized, response is <?><CR>
+
+;---
+General notes:
+Standard command response codes:
+
+ACK_OK					'0'					; command accepted	
+ACK_ARG_ERR				'1'					; argument parse error
+ACK_BAD_CAP				'2'					; cap code is out of range ( 8 >= cap_code <= 2097151)
+ACK_BUFF_FULL		 	'3'					; pocsag tx buffer does not have room for msg, discarded
+ACK_MSG_OVF				'4'					; msg too long to process
+ACK_MSG_ERR				'5'					; no msg, or corrupted message
+ACK_COMM_TIMEOUT		'7'					; too long a time period between console chars,  cmd flushed
+ACK_Q					'?'					; unknown command	
+
+
+;---
+Canned messages are triggered by a low going signal on specified input pins. 
+
+PB0 = MSG_1
+PB1 = MSG_2
+PB2 = MSG_3
+PB3 = MSG_4
+
+If pin remains low for greater then set re-transmission period, message is resent.  
+Inputs are de-bounced and edge triggered. Must remain low for > 50ms for low closure to be detected. 
+
+;---
+POCSAG Baud rate are typically specified by a single digit number
+0 = 512, 1 = 1200, 2 = 2400 baud 
+
+;---
+The commands:
+Single letter commands recognized by the command processor:
+
+;---
+Command: P
+Short description: Send alphanumeric page with EEPROM stored default parameters
+Syntax: P<CAPCODE>,<FUNCTION>,<ALPHA_MSG STRING><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR> Err: parsing arguments   
+<2><CR>	Err: bad cap code
+<3><CR>	Err: TX buffer was full. Msg was discarded
+
+Notes:
+Examples:
+P1234567,0,The Future is NOW!<cr>		Sends msg to pager
+
+;---
+command: N
+Short Description: Send numeric page with EEPROM stored default parameters
+Syntax: P<CAPCODE>,<FUNCTION>,<NUM_MSG STRING><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR> Err: parsing arguments   
+<2><CR>	Err: bad cap code
+<3><CR>	Err: TX buffer was full. Msg was discarded
+
+Notes: 0-9, spaces and optional chars (dash, brackets, urgency, etc) are encoded. non-valid chars are encoded as spaces
+Examples:
+P1234567,3,212-555-1212<cr>		Sends msg to pager
+
+;---
+Command: # 
+Short description: send a page message with all message parameters specified. Ignores EEPROM message settings. 
+Syntax: #<A/N>,<BAUD>,<INVERT>,<CAPCODE>,<FUNCTION>,<MSG STRING><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR>	Err: parsing arguments   
+<2><CR>	Err: Bad cap code
+<4><CR>	Err: MSG overflow, MSG was too long.
+
+Examples:
+
+#A,0,0,1234567,0,ABC<CR>		send alpha message 512 baud  non-invert (Func 0)
+#N,2,1,1234567,0,123<CR>		send numeric message 2400 baud invert (Func 0) 
+
+
+;---
+Command: O
+Short description: Save station ID interval in seconds.
+Syntax: O<0-3600><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR>	Err: parsing arguments  
+
+Examples:
+O600<CR>   sets interval to 10 minutes (600 seconds) 	
+
+Notes: Sets the maximum ID period. Any message transmission after the timer expires will have the stored ID string appended and sent as morse code.   
+Does not station ID unless there is also a normal transmission being sent.
+
+
+;---
+Command: A
+Short description: Configure beacon behaviour.
+Syntax: O<0-3600>,<MSG SLOT><FORCE ID><CR>	
+
+Response:
+<0><CR>	Command was interpreted properly
+<ERR_CODE><CR>	Err: parsing arguments  
+
+Examples:
+O600,5,1<CR>   	Send msg slot 5 every 10 minutes with morse ID appended.
+O300,0,1<CR>   	Send just a morse ID every 5 minutes.
+
+Notes: The Beacon is separate from station ID function.  
+Beacons can be any canned message slot, and optionally have a morse ID message appended.
+Beacons can also be just the morse ID message without any pocsag message.
+MSG SLOT 0 means no POCSAG msg slot selected. 
+MSG SLOT 5 is an additional slot that can be used for the beacon.
+
+;---
+Command: U
+Short description: Save station ID for automatic morse station ID beacon
+Syntax: U<ID STRING><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<4><CR>	Err: MSG overflow, MSG was too long.
+
+Examples:
+UN2RVQ-X<CR>	
+
+Note: a zero length ID will erase any previous ID and mark ID as invalid. Disabling ID function 
+
+;---
+command: G
+Short Description: Configure carrier detect pin behaviour.
+Syntax: G<0/1/2><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR>  Err: parsing arguments   
+
+0 = XMIT IGNORE. Send xmit messages immediately.
+1 = XMIT HIGH. Only xmit messages when RADIO_CD pin is high. 
+2 = XMIT LOW. Only xmit messages when RADIO_CD pin is low 
+
+Notes: Messages will remain in output queue until CD pin allows transmission.  
+CD pin is de-bounced.   
+
+Examples:
+
+;---
+Command: % Short description: Send canned pocsag message
+
+Syntax: %<MSG SLOT><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR>	Err: parsing arguments   
+<4><CR>	Err: MSG overflow, MSG was too long.
+<5><CR>	Err: No valid message in slot.
+
+Examples:
+%1<CR>		send canned message slot 1
+%2<CR>		send canned message slot 2
+
+Note. Empty slots are ignored.
+
+;---
+Command: D Short description: Save canned pocsag message to eeprom storage slot
+
+Syntax: D<MSG SLOT>,<A/N>,<BAUD>,<INVERT>,<CAPCODE>,<FUNCTION>,<MSG STRING><CR>	
+
+Response:
+<0><CR>	Msg was saved properly
+<1><CR>	Err: parsing arguments   
+<2><CR>	Err: Bad cap code
+<4><CR>	Err: MSG overflow, MSG was too long.
+
+Examples:
+
+D1,A,0,0,1234567,0,ABCDEF<CR>		save alpha message 512 baud  non-invert (Func 0) to canned slot 1
+D2,N,2,1,1234567,0,123-4567<CR>		save numeric message 2400 baud invert (Func 0) to canned slot 2
+
+Note. All message parameters must be specified.
+
+;---
+Command: E Short description: Sets canned message re-transmission interval
+
+Syntax: E<MSG SLOT>,<0-3600)<CR>	
+
+Response:
+<0><CR>	Parameter was saved properly
+<1><CR>	Err: parsing arguments   
+
+Examples:
+
+E1,30<CR>		Sets canned msg 1 retransmission interval to 30 seconds
+E2,600<CR>		Sets canned msg 2 retransmission interval to 10 minutes
+
+Notes. Sets the time period at which a canned message is resent when the input is held low.
+If zero, no re-transmissions will be sent.
+
+
+;---
+command: M
+Short Description: Send a morse message
+Syntax: M<ALPHA_MSG STRING><CR>	
+
+Response:
+<0><CR>	Msg was enqueued properly
+<1><CR>	Err: parsing arguments   
+<3><CR>	Err: TX buffer was full. Msg was discarded
+
+Note. WPM rate should have been previously set.
+
+;---
+command: F
+Short Description: Set function code mapping for pocsag message decoding.
+Syntax: F<FUNCTION>,<A/N><CR>	
+
+Response:
+<0><CR>		Parameter was saved properly.
+<1><CR>   	Err: parsing arguments   
+
+
+Notes: Used for mapping decoding method for a particular function (alpha or numeric) 
+Examples:
+F0,A<CR>  Sets Function 0 to decode as alpha numeric
+F3,N<CR>  Sets Function 3 to decode as a numeric page
+
+;---
+command: B
+Short Description: Set default pocsag transmit baud rate. 
+Syntax: B<0-2><CR>	
+
+Response:
+<0><CR>		Parameter was saved properly.
+<1><CR>   	Err: parsing arguments   
+
+Notes: 0=512baud, 1=1200, 2=2400 
+Examples:
+B1<CR>		Set TX to 1200 baud
+
+Note that this sets the default baud for queueing any pages that don't have baud rate specified.
+This vale is saved in eeprom. Is usually only set once.
+
+;---
+command: C
+Short Description: Set pocsag receive baud rate
+
+Syntax: C<0-2><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>   	Err: parsing arguments   
+
+Notes: 0=512baud, 1=1200, 2=2400 
+Examples:
+C0<CR>		Set RX baud rate to 512 baud
+
+;---
+command: R
+Short Description: Enable pocsag data reception
+Syntax: R<0/1><CR>	
+
+Response:
+<0><CR>	Parameter was saved properly.
+<1><CR>	Err: parsing arguments   
+
+Notes: 0=off 1=on 
+Examples:
+
+;---
+command: X
+Short Description: Enable reception of bad pocsag data
+Syntax: X<0/1><CR>	
+
+Response:
+<0><CR>	Parameter was saved properly.
+<1><CR>	Err: parsing arguments   
+
+Notes: Display received messages even with uncorrectable errors 
+0=off 1=on 
+Examples:
+
+;---
+command: I
+Short Description: Set default pocsag transmit data inversion
+Syntax: I<0/1><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments   
+
+Notes: On = data is inverted before transmission 
+0=off 1=on 
+
+Examples:
+
+;---
+command: H
+Short Description: Set pocsag receive data inversion
+Syntax: H<0/1><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments   
+
+Notes: On = Received data is assumed to be inverted.
+TX and RX data inversion must match for data reception.
+ 
+0=off 1=on 
+Examples:
+
+;---
+command: T
+Short Description: Set transmitter PTT output pin polarity to invert
+Syntax: T<0/1><CR>	
+
+Response:
+<0><CR>	Parameter was saved properly.
+<1><CR>	Err: parsing arguments  
+
+Notes:	0 = ptt line high to key, 1 = inverted (low to key)
+		0 = Normal	1 = Inverted 
+Examples:
+
+;---
+command: J
+Short Description: Set transmitter pretime
+Syntax: J<0-255><CR>	
+
+Response:
+<0><CR>	Parameter was saved properly.
+<1><CR>	Err: parsing arguments  
+
+Notes: 	Time after radio is keyed before data stream starts. In units of .01 seconds (10ms)
+		0=No delay
+Examples:
+
+
+;---
+command: K
+Short Description: Set transmitter post time
+Syntax: K<0-255><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments  
+
+Notes: 	Time after radio data stream ends before un-keying radio.  In units of .01 seconds (10ms)
+		0=No delay
+
+;---
+command: L
+Short Description: Set pocsag preamble length
+Syntax: L<0-255><CR>	
+
+Response:
+<0><CR>	Parameter was saved properly.
+<1><CR>	Err: parsing arguments  
+
+Notes: 	Number of pocsag preamble words. Default is 18 words (18*32 = 576 bit reversals) 
+
+		
+;---
+command: W
+Short Description: Set morse id basic dit length
+Syntax: W<0-255><CR>
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments  
+
+Notes: Sets basic time unit for morse id transmissions. In units of .01 seconds (10ms)
+Determines WPM transmission speed. 
+
+;---
+command: V
+Short Description: Reply with version info
+Syntax: V<CR>
+
+Response:
+<version information string><CR>
+
+;---
+command: S
+Short Description: Get encoder status.
+Syntax: S<CR>
+
+Response:
+TBD<CR> 
+
+Notes:  Returns hex encoded bit fields of the current state/status of the encoder. (in receive, in transmit, and etc).
+Also has state of Carrier Detect  (CD) pin.
+  
+Needs further documentation.
+
+;---
+command: Y
+Short Description: Enables RTS Sleep feature.
+Syntax: Y<0/1><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments  
+
+Notes:	When Enabled, a high input on the RTS input pin will put the encoder into low power sleep mode.
+If enabled, encoder will not respond to any commands unless the RTS line is externally driven low.  
+
+Examples:
+
+;---
+command: Z
+Resets non-volatile (eeprom) configuration values to defaults.
+Syntax: Z<0/1><CR>	
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments  
+
+Examples: 
+
+Z0<CR>  reset config, leave canned messages intact.
+Z1<CR>  Completely resets encoder to factory defaults.
+
+Notes: Two types of resets. One will just reset config values. The other resets config values and also erases all canned messages and the station ID. 	 
+
+;---
+command: ?
+Short Description: Dump current configuration. One per line.
+Syntax: ?<CR>	
+
+Response:
+<config parameters><CR>
+<...><CR>
+<0><CR> done	
+
+Examples:
+Debugging commands (not normally documented):
+;---
+command: !
+dumps first page of eeprom data
+Syntax: D<CR>
+
+Response:
+hex data dump
+
+;---
+command: :
+Short Description: Enable / disable debug mode
+Syntax: :<0/1><CR>
+
+Response:
+<0><CR>	ok
+<1><CR>	Err: parsing arguments  
+
+Notes: 	When enabled, hex data is sent to console as page is sent to radio. 
+
+
+ 
+
+

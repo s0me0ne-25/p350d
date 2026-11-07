@@ -1,0 +1,3 @@
+# Allow the paging daemon to shut the station down when the hardware
+# power switch is turned off. Install with mode 0440 and check with visudo -c.
+pagerd ALL=(root) NOPASSWD:/usr/sbin/poweroff

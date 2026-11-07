@@ -1,0 +1,10 @@
+Copyright and license:
+  The pocsag transcode program is copyright Henry Carl Ott N2RVQ. It is made available for educational,
+and non-commercial use. Commercial use forbidden without license from author.
+ Questions, comments or offers of cash? hcarlott@gmail.com
+
+Disclaimer: 
+ This source code is provided on an 'as is' basis for educational purposes only. 
+No guarantee is provided or implied for any implementation or purpose. I do not 
+assume any liability for any business loss, property loss, personal loss,
+personal injury, or any other kind of loss. Use at your own risk!  

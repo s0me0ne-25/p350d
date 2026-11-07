@@ -1,0 +1,14 @@
+The only fuses that really matter are:
+
+Set for external full swing crystal oscillator.
+Disable divide by 8.
+
+
+Typical values:
+Low 		0xF6 
+High		0xD9
+Extended	0xFF
+
+
+This is the avrdude string (untested)
+-U lfuse:w:0xf6:m -U hfuse:w:0xd9:m -U efuse:w:0xff:m

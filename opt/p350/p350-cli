@@ -1,0 +1,11 @@
+#!/bin/bash
+echo help | nc localhost 16032
+echo
+echo "^C to exit CLI utility"
+echo
+while [[ true ]]; do
+	echo -n '> '
+	read cmd
+	echo "$cmd" | nc localhost 16032
+	echo
+done

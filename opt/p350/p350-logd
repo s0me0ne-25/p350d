@@ -1,0 +1,15 @@
+#!/bin/bash
+cd `dirname $0`
+
+MAXLINES=1000
+case $1 in
+	msg)
+		rm -f /tmp/p350-msg.log
+		journalctl -u p350d --no-tail --no-pager -f -g 'Paged text' -q --no-hostname | sed -u 's/pagerd\[[0-9]*\]: \[[0-9\:]*\] Paged text:[ ]*/: /g' | sed -u 's/(CC=.*)$//g' >> /tmp/p350-msg.log
+		;;
+		
+	all)
+		rm -f /tmp/p350-all.log
+		journalctl -u p350d -n$MAXLINES --no-pager -o cat -f >> /tmp/p350-all.log
+		;;
+esac

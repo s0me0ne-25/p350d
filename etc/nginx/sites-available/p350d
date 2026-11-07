@@ -1,0 +1,26 @@
+# p350d web interface: message form (/) and admin page (/admin)
+server {
+	listen 80 default_server;
+	root /opt/p350/html;
+
+	index index.php;
+
+	server_name _;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ =404;
+	}
+
+	# Pass PHP scripts to PHP-FPM
+	location ~ \.php$ {
+		include snippets/fastcgi-php.conf;
+		fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+	}
+
+	# Deny access to .htaccess files
+	location ~ /\.ht {
+		deny all;
+	}
+}

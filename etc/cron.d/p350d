@@ -1,0 +1,3 @@
+# Rotate p350d logs: restart the log collectors that feed the web UI
+0  */6  * * *   root    /usr/bin/systemctl restart p350d-log@all
+30 */6  * * *   root    /usr/bin/systemctl restart p350d-log@msg

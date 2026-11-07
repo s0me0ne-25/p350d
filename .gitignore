@@ -1,0 +1,12 @@
+# Runtime state written by pagerd
+opt/p350/pconf.json
+opt/p350/pconf.json.tmp
+opt/p350/pconf.json.broken-*
+
+# Build artifacts
+opt/p350/i2clcd.so
+__pycache__/
+*.pyc
+
+# Local backups
+*.bak

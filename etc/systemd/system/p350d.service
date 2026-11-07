@@ -1,0 +1,16 @@
+[Unit]
+Description=Paging station daemon
+RequiresMountsFor=/
+Wants=time-sync.target
+After=time-sync.target
+
+[Service]
+Type=simple
+ExecStart=/opt/p350/pagerd
+Restart=always
+User=pagerd
+Group=pagerd
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
