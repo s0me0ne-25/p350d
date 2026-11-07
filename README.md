@@ -40,7 +40,8 @@ Raspberry Pi. This repository publishes that production setup as is.
     live log;
   - a console client;
   - a 16×2 LCD on the station itself.
-- **Hardware power switch.** Turning it off shuts the Pi down cleanly.
+- **Hardware power switch.** Turning it off shuts the Pi down cleanly. A
+  delay relay then cuts power to the station.
 - **Wireless sensors (experimental).** A 433 MHz ASK receiver speaking the
   RadioHead protocol. Received packets are currently only logged.
 
@@ -66,8 +67,8 @@ planned, because every change has to be checked on real hardware.
 
 ```
                 UART 9600 8N1                  data + PTT
- Raspberry Pi ───────────────► Modulator ────────────────► FM transmitter
-   (pagerd)    level divider   Arduino #1, N2RVQ firmware  (e.g. Motorola GM350)
+ Raspberry Pi ◄──────────────► Modulator ────────────────► FM transmitter
+   (pagerd)    level dividers  Arduino #1, N2RVQ firmware  (e.g. Motorola GM350)
       │
       │ I²C (active level shifter)
       ├──► LCD 16×2, HD44780 + PCF8574, address 0x27
@@ -88,9 +89,9 @@ planned, because every change has to be checked on real hardware.
 | Transmitter | Motorola GM350 or any FM transmitter with a flat (unfiltered) modulator input. Data polarity and deviation must be set correctly for pagers to decode reliably. |
 | Power monitor | ATmega168 or ATmega328 Arduino running [`pager350_i2c.ino`](opt/p350/arduino-firmware/pager350_i2c.ino). |
 | LCD | HD44780 16×2 with a PCF8574 I²C backpack. |
-| Level shifting | An active shifter on I²C (Pi 3.3 V ↔ 5 V Arduinos and LCD). A resistive divider on the modulator's TX → Pi RX line. |
+| Level shifting | An active shifter on I²C (Pi 3.3 V ↔ 5 V Arduinos and LCD). Resistive dividers on both serial lines between the Pi and the modulator. |
 | Alarm button | A latching button with a built-in LED and two contact groups. One group connects GPIO17 to ground. The other connects the LED to the blinking D10 output, so the LED flashes while the button is latched. Releasing the latch clears the alarm. |
-| Power switch | Connects GPIO4 to ground in the OFF position. |
+| Power switch | In the OFF position it does two things. It connects GPIO4 to ground, so the daemon shuts the Pi down. It also starts a delay relay that then cuts power to the whole station. Set the delay well above the time the Pi needs to shut down; the reference station uses about 1.5 minutes. |
 | Battery | 12 V lead-acid (6 cells, up to 14.5 V), connected to A1 through a voltage divider. |
 | UPS / PSU | Must provide a logic signal that tells the power monitor whether mains is present. On D7, HIGH means "on battery". |
 
