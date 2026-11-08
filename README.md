@@ -45,7 +45,7 @@ Raspberry Pi. This repository publishes that production setup as is.
 - **Wireless sensors (experimental).** A 433 MHz ASK receiver speaking the
   RadioHead protocol. Received packets are currently only logged.
 
-## Before you transmit
+## Disclaimer
 
 You are responsible for complying with the radio regulations of your country.
 Transmit only on frequencies you are authorised to use. The modulator firmware
@@ -54,11 +54,12 @@ amateur radio use (see the modulator's protocol notes).
 
 ## Project status and scope
 
-The platform is **deliberately frozen**. The station runs on Raspbian 11
-(Bullseye) on a Raspberry Pi 1 with RPi.GPIO, pigpio and wiringPi. These
-libraries are not supported on newer releases of Raspberry Pi OS or on the
-Raspberry Pi 5, and porting is out of scope. The code is published as it runs
-in production.
+The hardware platform and underlying software stack is deliberately frozen. My
+p350d installation is an embedded integrated appliance which works quite well the
+way it was assembled back in 2021. The station runs on Raspbian 11 (Bullseye) on
+a Raspberry Pi 1 with RPi.GPIO, pigpio and wiringPi. These libraries are not 
+supported on newer releases of Raspberry Pi OS or on the Raspberry Pi 5, and 
+porting is out of scope. The code is published as it runs in production.
 
 Bug reports and small, focused fixes are welcome. Large refactoring is not
 planned, because every change has to be checked on real hardware.
