@@ -1,5 +1,18 @@
 <?php
 	setlocale(LC_CTYPE, "en_US.UTF-8");
+
+	// Station name from the pagerd config. Deliberately simple parser;
+	// any problem (no file, no setting, empty value) gives "Unknown".
+	function getInstallationName() {
+		$config = @file_get_contents(__DIR__ . '/../../pagerd_config.py');
+		if ($config !== false &&
+				preg_match('/^\s*INSTALLATION_NAME\s*=\s*([\'"])(.*?)\1/m', $config, $m) &&
+				$m[2] !== '') {
+			return $m[2];
+		}
+		return 'Unknown';
+	}
+
 	if (isset($_GET['ajax'])) {
 		
 		// Handle txstate commands
@@ -66,7 +79,7 @@
 <html lang=en>
 <head>
 <meta charset=utf-8>
-<title>P350</title>
+<title><?php echo htmlspecialchars(getInstallationName()); ?></title>
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
