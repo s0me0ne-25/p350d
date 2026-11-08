@@ -1,0 +1,331 @@
+/*
+ * p350d web interface styles, shared by the message form (body.page_user)
+ * and the admin page (body.page_admin).
+ *
+ * Common rules come first. Page-specific rules are scoped by the body class,
+ * so they never leak into the other page and always override the common
+ * ones regardless of order.
+ */
+
+/* ---------------------------------------------------------------- Common */
+
+body {
+	margin: auto;
+}
+
+h3 {
+	font-family: sans-serif;
+	font-size: 14px;
+}
+
+.pager_body {
+	border-style: outset;
+	border-color: rgba(80, 80, 80, .6);
+	background-color: #0f0f0f;
+	background-image: url(/plastic.jpg);
+}
+
+.pager_display {
+	border-style: groove;
+	border-color: rgba(80, 80, 80, .6);
+	outline: none;
+}
+
+.label {
+	color: rgba(213, 179, 0, .8);
+}
+
+.btn_down {
+	border-style: inset !important;
+}
+
+/* ------------------------------------------------- Message form (/) only */
+
+body.page_user {
+	max-width: 700px;
+}
+
+.page_user h3		{ color: #00a8de; }
+.page_user h3.hide	{ color: white; }
+.page_user h3.err	{ color: red; }
+.page_user h3.ok	{ color: green; }
+
+.page_user .pager_body {
+	padding: 10px 20px 30px 20px;
+	border-radius: 30px;
+	border-width: 15px;
+}
+
+.page_user .pager_display {
+	width: 450px;
+	display: inline;
+	font: 16pt monospace;
+	resize: none;
+	border-radius: 20px;
+	padding: 15px;
+	margin: 0;
+	background-color: #00ff66;
+	border-width: 7px;
+}
+
+.page_user .label {
+	font: bold italic 20pt sans-serif;
+	padding: 7px;
+}
+
+.page_user .send_btn {
+	width: 100px;
+	height: 100px;
+	display: inline;
+	font: bold 40pt sans-serif;
+	border-radius: 20px;
+	margin: 4px 0 4px 8px;
+	background-color: #0f0f0f;
+	color: rgba(213, 179, 0, .8);
+	border-style: groove;
+	border-width: 7px;
+	border-color: rgba(80, 80, 80, .6);
+	outline: none;
+}
+
+/* -------------------------------------------------- Admin page (/admin) only */
+
+body.page_admin {
+	max-width: 800px;
+}
+
+.page_admin h3 {
+	color: #800000;
+}
+
+.page_admin .pager_body {
+	padding: 10px 7px 30px 20px;
+	border-radius: 20px;
+	border-width: 10px;
+}
+
+.page_admin .pager_display {
+	width: 500px;
+	display: block;
+	border-radius: 14px;
+	padding: 15px 4px 15px 15px;
+	margin: 4px 20px 0 0;
+	background-color: #00ff88;
+	border-width: 6px;
+	position: relative;
+}
+
+.page_admin .display_small {
+	border-radius: 4px;
+	background-color: #00ff88;
+	border-style: groove;
+	border-width: 3px;
+	border-color: rgba(80, 80, 80, .6);
+	outline: none;
+	position: relative;
+	width: 29px;
+	padding: 9px 0 9px 9px;
+	margin-left: 5px;
+	display: inline-block;
+	font: bold 12pt monospace;
+}
+
+.page_admin .display_top {
+	width: 100%;
+	padding: 0 15px 0 0;
+	margin-bottom: -6px;
+}
+
+.page_admin .label {
+	font: italic 15pt sans-serif;
+	vertical-align: bottom;
+}
+
+.page_admin .indicators {
+	text-align: right;
+	vertical-align: middle;
+	padding: 0 10px 0 0;
+}
+
+.page_admin tr.spacer {
+	margin-bottom: 10px;
+	display: grid;
+}
+
+.page_admin .led {
+	display: inline-block;
+	border-style: groove;
+	border-width: 5px;
+	border-color: rgba(30, 30, 30, .8);
+	border-radius: 9px;
+	width: 20px;
+	height: 7px;
+	background-color: #505050;
+}
+
+.page_admin .btn {
+	text-align: center;
+	display: inline-block;
+	background-color: #0f0f0f;
+	color: rgba(213, 179, 0, .8);
+	border-style: groove;
+	border-color: rgba(80, 80, 80, .6);
+	outline: none;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.page_admin .btn_station_cfg {
+	font: 10pt sans-serif;
+	vertical-align: middle;
+	border-width: 3px;
+	border-radius: 4px;
+	padding: 5px 0;
+	width: 100px;
+	margin-top: 2px;
+	margin-bottom: 2px;
+}
+
+.page_admin .w150 {
+	width: 150px;
+}
+
+.page_admin .mb {
+	margin-bottom: 4px;
+}
+
+.page_admin #btn_silent_restart {
+	margin-top: 4px;
+}
+
+.page_admin .btn_filter {
+	width: 32px;
+	height: 32px;
+	font: 21px sans-serif;
+	border-width: 3px;
+	border-radius: 4px;
+}
+
+.page_admin .btn_txstate {
+	width: 44px;
+	height: 10px;
+	font: bold 9px sans-serif;
+	border-width: 3px;
+	border-radius: 4px;
+}
+
+.page_admin .btgreen {
+	color: #30B32D !important;
+}
+
+.page_admin .btred {
+	color: #F03E3E !important;
+}
+
+.page_admin .btblue {
+	color: #1f2fff !important;
+}
+
+.page_admin .btn_txstate_down {
+	border-style: inset !important;
+	margin-bottom: -3px;
+	margin-right: -1px;
+}
+
+.page_admin .filter_btns {
+	vertical-align: bottom;
+	text-align: right;
+}
+
+.page_admin .txstate_btns {
+	text-align: center;
+	padding: 0 2px 0 0;
+}
+
+.page_admin .meter_box {
+	position: relative;
+}
+
+.page_admin .power_icon {
+	position: absolute;
+	bottom: 18px;
+	width: 30px;
+	height: 30px;
+	display: inline-block;
+	padding: 1px;
+}
+
+.page_admin .pi_right {
+	right: 14px;
+}
+
+.page_admin .pi_left {
+	left: 14px;
+}
+
+.page_admin .pi_center {
+	bottom: 2px;
+	left: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.page_admin .pi_overlay {
+	background-color: rgba(15, 15, 15, .95);
+	z-index: 1;
+}
+
+.page_admin .meter_panel {
+	border-style: inset;
+	border-width: 4px;
+	border-color: rgba(60, 60, 60, .6);
+	border-radius: 8px;
+	background-color: rgba(0, 0, 0, .6);
+	width: 150px;
+	display: inline-block;
+}
+
+.page_admin #voltmeter {
+	height: 120px;
+}
+
+.page_admin #txstate {
+	height: 47px;
+}
+
+.page_admin .log_view {
+	width: 500px;
+	display: block;
+	font: 10pt monospace;
+	resize: none;
+	background-color: rgba(0, 0, 0, 0);
+	border-style: none;
+	outline: none;
+}
+
+.page_admin .label_small {
+	font: bold italic 10pt sans-serif;
+	color: rgba(213, 179, 0, .8);
+	padding: 0 10px 6px 0;
+	border-width: 0 0 3px 0;
+	border-style: groove;
+	border-color: rgba(60, 60, 60, .6);
+}
+
+.page_admin textarea::-webkit-scrollbar {
+	width: 16px;
+	background-color: rgba(0, 0, 0, 0);
+}
+
+.page_admin textarea::-webkit-scrollbar-thumb {
+	background-color: rgba(0, 25, 10, .65);
+}
+
+.page_admin .table_glued {
+	padding: 0;
+	border-spacing: 0;
+	width: 100%;
+}
