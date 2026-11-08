@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
+import os
+import shutil
+import importlib
 from datetime import datetime
 
 def debug(text, newline=True, timestamp=True):
@@ -10,30 +13,62 @@ def debug(text, newline=True, timestamp=True):
     print (timestamp + text, flush=True, end=endchar)
 
 ## CONFIG
-SERIAL = '/dev/ttyAMA0'         # Serial port the POCSAG modulator is connected to
+# Station settings live in pagerd_config.py next to this script. That file
+# is local to the station and not tracked by git. If it does not exist, it
+# is created from pagerd_config.py.defaults. If it exists but cannot be
+# loaded, pagerd refuses to start rather than run with default capcodes.
+CONFIG_NAME = 'pagerd_config'
+CONFIG_DIR = os.path.dirname(os.path.realpath(__file__))
+CONFIG_FILE = os.path.join(CONFIG_DIR, CONFIG_NAME + '.py')
+CONFIG_DEFAULTS = CONFIG_FILE + '.defaults'
 
-BAUD_RATE = 512                 # TX baud rate: 512, 1200 or 2400
+# Every setting pagerd needs. Each one must be defined in the config file.
+CONFIG_VARS = [
+    'INSTALLATION_NAME',
+    'SERIAL', 'BAUD_RATE',
+    'CAPCODE', 'CAPCODE_BACKGROUND', 'MSGTYPE',
+    'DUMMY_CAPCODE', 'DUMMY_MSGTYPE',
+    'PING_INTERVAL', 'RETX_COUNT', 'RETX_STEP', 'RETX_COOLDOWN',
+    'REPEAT', 'TX_TOT_LIMIT', 'PREKEY_MS', 'POSTKEY_MS',
+    'CONTROL_PORT', 'STARTMSG', 'STOPMSG',
+    'THRESHOLD', 'HYSTER',
+    'GPIO_POWER_SWITCH', 'GPIO_RED_BUTTON',
+    'RX', 'BPS', 'DEVICE_ADDRESS',
+]
 
-CAPCODE = 1234567               # For real messages (urgent)
-CAPCODE_BACKGROUND = 1765432    # For real messages (background digests)
-MSGTYPE = 3                     # Message type a.k.a. POCSAG func bits a.k.a. CC extension (for both above)
+if CONFIG_DIR not in sys.path:
+    sys.path.insert(0, CONFIG_DIR)
 
-DUMMY_CAPCODE = 1111111         # Keepalives are minimal valid POCSAG traffic addressed to nobody
-DUMMY_MSGTYPE = 0               # just to make pagers know they are within coverage. So, totally made up CC/FB here
+if not os.path.exists(CONFIG_FILE):
+    debug('Config ' + CONFIG_FILE + ' not found, resorting to defaults')
+    try:
+        shutil.copyfile(CONFIG_DEFAULTS, CONFIG_FILE)
+    except Exception as e:
+        debug('Error: cannot copy default config ' + CONFIG_DEFAULTS + ' (' + repr(e) + ')')
+        sys.exit(1)
+    debug('Default config copied to ' + CONFIG_FILE)
+    importlib.invalidate_caches()
 
-PING_INTERVAL = 120             # Interval to send digests and keepalives, as well as retransmit (see below)
+try:
+    cfg = importlib.import_module(CONFIG_NAME)
+except Exception as e:
+    debug('Error: cannot load config ' + CONFIG_FILE + ' (' + repr(e) + ')')
+    sys.exit(1)
 
-RETX_COUNT = 50                 # Retransmit messages N times in addition to the initial transmission
-                                # to improve reception chances
-RETX_STEP = 1                   # Retransmit every N ping intervals
-RETX_COOLDOWN = 40              # Transmitter cooldown between retxed messages
+# Report unknown names first: a typo in a setting name shows up here,
+# right before the error about the setting it was meant to be.
+for name in sorted(n for n in vars(cfg) if n.isupper() and n not in CONFIG_VARS):
+    debug('Warning: unknown setting ' + name + ' in ' + CONFIG_FILE + ' is ignored')
 
-REPEAT = 3                      # Repeat every message N times (1...10) under one preamble to improve reception
-
-TX_TOT_LIMIT = 10               # Seconds. REPEATs are limited by this for every message processed
-
-PREKEY_MS = 100                 # Milliseconds. Delay between transmitter keying and message start
-POSTKEY_MS = 100                # Milliseconds. Delay between message end and transmitter dekeying
+# Print every setting: this both checks that all of them are defined and
+# gives the station administrator a summary of the current parameters.
+try:
+    for name in CONFIG_VARS:
+        globals()[name] = getattr(cfg, name)
+        debug('Config: ' + name + ' = ' + repr(globals()[name]))
+except AttributeError:
+    debug('Error: setting ' + name + ' is missing in ' + CONFIG_FILE + ', see ' + CONFIG_DEFAULTS)
+    sys.exit(1)
 
 # Map baud rate to encoder command
 BAUD_MAP = {
@@ -60,20 +95,6 @@ ENCODER_INIT = [
         'J'+str(PREKEY_MS // 10),       # Prekeying
         'K'+str(POSTKEY_MS // 10),      # Postkeying
     ]
-
-CONTROL_PORT = 16032
-
-STARTMSG='СТАНЦИЯ ЗАПУЩЕНА'
-STOPMSG='СТАНЦИЯ ОТКЛЮЧАЕТСЯ'
-
-# Automatically disable TX to prevent overdischarging at:
-THRESHOLD = 11.0
-HYSTER = 0.2
-
-# Sensors connection via RadioHead ASK
-RX=27                   # GPIO pin of ASK receiver
-BPS=1200                # RF channel baud rate
-DEVICE_ADDRESS=1        # This station address in RadioHead protocol
 
 ## CODE
 
@@ -494,9 +515,6 @@ redButtonDownMs = 0
 pocsag = PocsagSerial(SERIAL)
 pconf = PersistConfig('pconf.json')
 emerman = pconf.config[PersistConfig.EMERMAN]
-
-GPIO_POWER_SWITCH = 4
-GPIO_RED_BUTTON = 17
 
 # Ensure the instance is unique
 me = singleton.SingleInstance() # will sys.exit(-1) if other instance is running
@@ -946,7 +964,7 @@ class ControlHandler(socketserver.BaseRequestHandler):
             debug(response)
 
         elif cmd == 'help':
-            response = """P350 POCSAG transmitter control system
+            response = INSTALLATION_NAME + """ POCSAG transmitter control system
 
 Supported commands:
 - page <text> -- Pages a message

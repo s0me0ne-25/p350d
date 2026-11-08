@@ -145,6 +145,7 @@ go to the same paths on the Pi.
 ```
 opt/p350/                      → /opt/p350
 ├── pagerd                     main daemon (Python 3)
+├── pagerd_config.py.defaults  default station settings
 ├── rh.py                      RadioHead ASK receiver on top of pigpio
 ├── rh_demo.py                 standalone sensor receiver demo
 ├── i2clcd.c                   LCD and power monitor I²C helper (built into i2clcd.so)
@@ -237,9 +238,13 @@ All commands below run on the Pi from a clone of this repository.
    (`PREKEY_MS`, `POSTKEY_MS`) before every transmission, so the modulator
    needs no manual setup.
 
-8. **Configuration.** Edit the constants at the top of `/opt/p350/pagerd`.
-   At the very least set your capcodes, and replace the placeholder logo (see
-   [Configuration](#configuration)).
+8. **Configuration.** Create the station settings from the defaults, then
+   edit `/opt/p350/pagerd_config.py`. At the very least set your capcodes,
+   and replace the placeholder logo (see [Configuration](#configuration)).
+
+   ```sh
+   sudo -u pagerd cp /opt/p350/pagerd_config.py.defaults /opt/p350/pagerd_config.py
+   ```
 
 9. **Start.**
 
@@ -258,10 +263,25 @@ All commands below run on the Pi from a clone of this repository.
 
 ## Configuration
 
-The settings are constants at the top of `pagerd`:
+Station settings live in `/opt/p350/pagerd_config.py`. This file belongs to
+the station and is not tracked by git, so updates never overwrite it.
+`pagerd_config.py.defaults` next to it holds the defaults and a comment for
+every setting.
 
-| Constant | Default | Meaning |
+- **No `pagerd_config.py`.** pagerd creates it from the defaults on start.
+  The defaults contain placeholder capcodes, so create and edit the file
+  before the first start.
+- **The file cannot be loaded, or a setting is missing.** pagerd refuses to
+  start and names the problem in the log. When an update adds a new setting,
+  copy it from the defaults.
+- **Every start.** All settings are printed to the log, together with a
+  warning about any unknown name, which is usually a typo.
+
+The main settings:
+
+| Setting | Default | Meaning |
 |---|---|---|
+| `INSTALLATION_NAME` | `'P350'` | Station name shown by the console client |
 | `SERIAL` | `/dev/ttyAMA0` | UART connected to the modulator |
 | `BAUD_RATE` | `512` | POCSAG baud rate: 512, 1200 or 2400 |
 | `CAPCODE` | `1234567` | Capcode for messages and alerts |
@@ -276,10 +296,11 @@ The settings are constants at the top of `pagerd`:
 | `PREKEY_MS`, `POSTKEY_MS` | `100`, `100` | Delay between keying the transmitter and the start of data, and between the end of data and unkeying, in milliseconds (0–2550, in 10 ms steps) |
 | `THRESHOLD`, `HYSTER` | `11.0`, `0.2` | Low-battery cutoff and its hysteresis, in volts |
 | `CONTROL_PORT` | `16032` | Control socket port, bound to 127.0.0.1 only |
+| `STARTMSG`, `STOPMSG` | `'СТАНЦИЯ ЗАПУЩЕНА'`, `'СТАНЦИЯ ОТКЛЮЧАЕТСЯ'` | Paged when the daemon starts ("station started") and stops ("station stopping") |
 | `GPIO_POWER_SWITCH`, `GPIO_RED_BUTTON`, `RX` | `4`, `17`, `27` | GPIO pins (BCM numbering) |
 
-Capcodes must be between 8 and 2097151. Alert texts and the start/stop
-messages are in Russian and are defined in `pagerd` as well.
+Capcodes must be between 8 and 2097151. Alert texts are in Russian and are
+defined in `pagerd`.
 
 **Logo.** The web interface ships with a placeholder logo. Replace
 `/opt/p350/html/logo.png` with your own image, keeping the same format and

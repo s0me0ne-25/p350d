@@ -1,3 +1,6 @@
+# Station settings, created from pagerd_config.py.defaults
+opt/p350/pagerd_config.py
+
 # Runtime state written by pagerd
 opt/p350/pconf.json
 opt/p350/pconf.json.tmp

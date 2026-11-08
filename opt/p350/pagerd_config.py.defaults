@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+# pagerd station settings.
+#
+# pagerd reads pagerd_config.py from its own directory. If that file does
+# not exist, it is created as a copy of pagerd_config.py.defaults. Edit
+# pagerd_config.py, which is local to the station and not tracked by git;
+# keep the .defaults file as shipped. pagerd refuses to start if
+# pagerd_config.py cannot be loaded or lacks any of the settings below.
+# All settings are printed to the log on start.
+
+INSTALLATION_NAME = 'P350'      # Station name shown by the control CLI
+
+SERIAL = '/dev/ttyAMA0'         # Serial port the POCSAG modulator is connected to
+
+BAUD_RATE = 512                 # TX baud rate: 512, 1200 or 2400
+
+CAPCODE = 1234567               # For real messages (urgent)
+CAPCODE_BACKGROUND = 1765432    # For real messages (background digests)
+MSGTYPE = 3                     # Message type a.k.a. POCSAG func bits a.k.a. CC extension (for both above)
+
+DUMMY_CAPCODE = 1111111         # Keepalives are minimal valid POCSAG traffic addressed to nobody
+DUMMY_MSGTYPE = 0               # just to make pagers know they are within coverage. So, totally made up CC/FB here
+
+PING_INTERVAL = 120             # Interval to send digests and keepalives, as well as retransmit (see below)
+
+RETX_COUNT = 50                 # Retransmit messages N times in addition to the initial transmission
+                                # to improve reception chances
+RETX_STEP = 1                   # Retransmit every N ping intervals
+RETX_COOLDOWN = 40              # Transmitter cooldown between retxed messages
+
+REPEAT = 3                      # Repeat every message N times (1...10) under one preamble to improve reception
+
+TX_TOT_LIMIT = 10               # Seconds. REPEATs are limited by this for every message processed
+
+PREKEY_MS = 100                 # Milliseconds. Delay between transmitter keying and message start
+POSTKEY_MS = 100                # Milliseconds. Delay between message end and transmitter dekeying
+
+CONTROL_PORT = 16032            # TCP port of the control socket (bound to 127.0.0.1)
+
+STARTMSG = 'СТАНЦИЯ ЗАПУЩЕНА'   # Paged when the daemon starts
+STOPMSG = 'СТАНЦИЯ ОТКЛЮЧАЕТСЯ' # Paged when the daemon stops
+
+# Automatically disable TX to prevent overdischarging at:
+THRESHOLD = 11.0                # Volts
+HYSTER = 0.2                    # Volts, +/- around THRESHOLD
+
+GPIO_POWER_SWITCH = 4           # GPIO pin (BCM) of the power switch, LOW = off
+GPIO_RED_BUTTON = 17            # GPIO pin (BCM) of the alarm button, LOW = alarm
+
+# Sensors connection via RadioHead ASK
+RX = 27                         # GPIO pin of ASK receiver
+BPS = 1200                      # RF channel baud rate
+DEVICE_ADDRESS = 1              # This station address in RadioHead protocol
