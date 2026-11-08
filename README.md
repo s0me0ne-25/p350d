@@ -234,7 +234,8 @@ All commands below run on the Pi from a clone of this repository.
      Arduino IDE. Calibrate the divider afterwards (see [Hardware](#hardware)).
 
    The daemon sends the modulator its baud rate, PTT polarity and keying delays
-   before every transmission, so the modulator needs no manual setup.
+   (`PREKEY_MS`, `POSTKEY_MS`) before every transmission, so the modulator
+   needs no manual setup.
 
 8. **Configuration.** Edit the constants at the top of `/opt/p350/pagerd`.
    At the very least set your capcodes, and replace the placeholder logo (see
@@ -271,7 +272,8 @@ The settings are constants at the top of `pagerd`:
 | `RETX_COUNT` | `50` | How many times a message is retransmitted after the first send |
 | `RETX_COOLDOWN` | `40` | Seconds between retransmissions, so the transmitter can cool down |
 | `REPEAT` | `3` | Copies of a message sent under one preamble (1–10) |
-| `TX_TOT_LIMIT` | `30` | Maximum length of a transmission in seconds; `REPEAT` is reduced to fit |
+| `TX_TOT_LIMIT` | `10` | Maximum length of a transmission in seconds, keying delays included; `REPEAT` is reduced to fit |
+| `PREKEY_MS`, `POSTKEY_MS` | `100`, `100` | Delay between keying the transmitter and the start of data, and between the end of data and unkeying, in milliseconds (0–2550, in 10 ms steps) |
 | `THRESHOLD`, `HYSTER` | `11.0`, `0.2` | Low-battery cutoff and its hysteresis, in volts |
 | `CONTROL_PORT` | `16032` | Control socket port, bound to 127.0.0.1 only |
 | `GPIO_POWER_SWITCH`, `GPIO_RED_BUTTON`, `RX` | `4`, `17`, `27` | GPIO pins (BCM numbering) |
@@ -322,7 +324,7 @@ every cycle anyway, and after it clears it stays in the archive digest for
 | Alert | Raised after | Start message | Clear message |
 |---|---|---|---|
 | Mains power loss | 10 checks (~5 s) | `НЕТ 220 БАТ=<volts>` ("no 220 V, battery = …") | `220 ОК` |
-| Internet loss (ping 8.8.8.8) | 40 checks (~20 s) | `НЕТ СЕТИ` ("no network") | `СЕТЬ ОК` |
+| Internet loss (TLS to 8.8.8.8:443) | 60 checks (~30 s) | `НЕТ СЕТИ` ("no network") | `СЕТЬ ОК` |
 | Alarm button latched | 8 checks (~4 s) | `ТРЕВОЖНАЯ КНОПКА` ("alarm button") | `СБРОС КНОПКИ` ("button reset") |
 
 Every alert message carries a timestamp. Resolved alerts go to the archive with
@@ -379,7 +381,8 @@ provide such an output directly.
 
 - No authentication on the web interface or the control socket (see
   [Installation](#installation)).
-- Connectivity is checked by pinging a single host, 8.8.8.8.
+- Connectivity is checked against a single host: a TLS handshake with
+  8.8.8.8:443 (Google Public DNS), every few seconds.
 - The daemon does not read the modulator's replies, so modulator-side errors
   such as a full transmit buffer go unnoticed.
 - Locking between the daemon's worker threads is minimal. This has caused no

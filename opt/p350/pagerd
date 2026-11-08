@@ -29,8 +29,11 @@ RETX_COOLDOWN = 40      # Transmitter cooldown between retxed messages
 REPEAT = 3              # Repeat every message N times (1...10)
                         # under one preamble to improve reception
 
-TX_TOT_LIMIT = 30       # Seconds. REPEATs are limited by this for
+TX_TOT_LIMIT = 10       # Seconds. REPEATs are limited by this for
                         # every message processed
+
+PREKEY_MS = 100                 # Milliseconds. Delay between transmitter keying and message start
+POSTKEY_MS = 100                # Milliseconds. Delay between message end and transmitter dekeying
 
 # Map baud rate to encoder command
 BAUD_MAP = {
@@ -43,11 +46,19 @@ if BAUD_RATE not in BAUD_MAP:
     debug(f'Error: Invalid baud rate {BAUD_RATE}. Must be 512, 1200, or 2400.')
     sys.exit(1)
 
+# Hard limits per Henry's docs for the modulator firmware
+PRE_POST_MIN = 0
+PRE_POST_MAX = 2550
+
+if (PREKEY_MS < PRE_POST_MIN) or (POSTKEY_MS < PRE_POST_MIN) or (PREKEY_MS > PRE_POST_MAX) or (POSTKEY_MS > PRE_POST_MAX):
+    debug(f'Error: PREKEY_MS or POSTKEY_MS out of supported range {PRE_POST_MIN} - {PRE_POST_MAX} ms.')
+    sys.exit(1)
+
 ENCODER_INIT = [
-        BAUD_MAP[BAUD_RATE],    # Dynamically set baud rate command
-        'T0',                   # non-inverted PTT
-        'J10',                  # 100ms prekeying
-        'K50'                   # 500ms postkeying
+        BAUD_MAP[BAUD_RATE],            # Dynamically set baud rate command
+        'T0',                           # non-inverted PTT
+        'J'+str(PREKEY_MS // 10),       # Prekeying
+        'K'+str(POSTKEY_MS // 10),      # Postkeying
     ]
 
 CONTROL_PORT = 16032
@@ -242,7 +253,7 @@ class Emergency(object):
         
 class EmergencyManager(object):
     
-    MAX_STRIKES = 40
+    MAX_STRIKES = 60
     
     ARCHIVE_EMPTY = "НЕТ ТРЕВОГ"
     #ARCHIVE_NONEMPTY = "АРХИВ ТРЕВОГ: "
@@ -708,7 +719,9 @@ def tx(msg, dispStatus):
     words_per_copy = 1 + mw  # 1 address word + message words
 
     # 2. Calculate the available word budget within TX_TOT_LIMIT with a 10% margin
-    max_bits = int(TX_TOT_LIMIT * BAUD_RATE * 0.9)
+    dead_time = (PREKEY_MS + POSTKEY_MS) / 1000.0
+    time_limit = (TX_TOT_LIMIT - dead_time) * 0.9
+    max_bits = int(time_limit * BAUD_RATE)
     available_bits = max_bits - 576  # Leave space for the preamble
     max_batches = available_bits // 544 if available_bits >= 0 else 0
     max_total_words = max_batches * 16  # Maximum words we can afford
@@ -722,6 +735,8 @@ def tx(msg, dispStatus):
     if repeat_safe <= 0:
         debug('Warning! Message exceeds TOT!')
         repeat_safe = 1
+
+    debug(f'{words_per_copy} POCSAG words, {max_total_words} words per TOT budget => repeat factor={repeat_safe}')
 
     # --- Step 3: Physical transmission ---
     for i in range(repeat_safe):
@@ -1033,7 +1048,7 @@ dispTimers = []
 dispTimers.append(RepeatTimer(0.5, processEmergencies)) 
 dispTimers.append(RepeatTimer(0.5, processPeripherals)) 
 dispTimers.append(RepeatTimer(0.5, processSensors)) 
-dispTimers.append(RepeatTimer(3, checkNetwork))
+dispTimers.append(RepeatTimer(5, checkNetwork))
 
 for timer in dispTimers:
     timer.start()
