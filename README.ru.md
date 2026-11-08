@@ -163,6 +163,7 @@ opt/p350/                      → /opt/p350
 etc/
 ├── systemd/system/            p350d.service, p350d-log@.service
 ├── nginx/sites-available/     сайт p350d
+├── php/7.4/fpm/conf.d/        защитные настройки PHP-FPM
 ├── sudoers.d/p350d            разрешает демону выключать Pi
 └── cron.d/p350d               периодический перезапуск сборщиков журнала
 third_party/
@@ -219,14 +220,16 @@ third_party/
    sudo install -m 0644 etc/cron.d/p350d /etc/cron.d/p350d
    ```
 
-6. **Веб-сервер.** Установите сайт p350d, отключите сайт по умолчанию
-   и перезагрузите nginx:
+6. **Веб-сервер.** Установите сайт p350d и защитные настройки PHP, отключите
+   сайт по умолчанию и перезапустите nginx и PHP-FPM:
 
    ```sh
    sudo cp etc/nginx/sites-available/p350d /etc/nginx/sites-available/
    sudo ln -s /etc/nginx/sites-available/p350d /etc/nginx/sites-enabled/p350d
    sudo rm /etc/nginx/sites-enabled/default
+   sudo install -m 0644 etc/php/7.4/fpm/conf.d/99-p350d-hardening.ini /etc/php/7.4/fpm/conf.d/
    sudo nginx -t && sudo systemctl reload nginx
+   sudo systemctl restart php7.4-fpm
    ```
 
 7. **Прошивки.** Прошейте обе Arduino:
@@ -263,6 +266,13 @@ third_party/
 > доступ, может отправлять сообщения, выключить передатчик и очистить очереди.
 > Держите станцию в доверенной сети или включите в nginx базовую
 > HTTP-авторизацию (`auth_basic` / `auth_basic_user_file`).
+
+> **PHP 7.4** больше не получает исправлений безопасности. Сайт и настройки PHP
+> выше смягчают октябрьские уязвимости PHP 2026 года CVE-2026-109618,
+> CVE-2026-109619 и CVE-2026-115560: в PHP-FPM отключено отслеживание прогресса
+> загрузки в сессии, а nginx отклоняет запросы `multipart/form-data` и тела
+> больше 16 КБ ещё до PHP. Веб-интерфейсу ни то, ни другое не нужно. Это
+> смягчение, а не исправление.
 
 ## Настройка
 

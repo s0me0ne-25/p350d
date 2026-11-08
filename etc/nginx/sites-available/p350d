@@ -7,6 +7,15 @@ server {
 
 	server_name _;
 
+	# Mitigation for the October 2026 PHP request parsing vulnerabilities
+	# (CVE-2026-109618, CVE-2026-109619, CVE-2026-115560): the web UI never
+	# uploads files and its requests are tiny, so refuse multipart bodies
+	# and anything large before they reach PHP.
+	client_max_body_size 16k;
+	if ($http_content_type ~* "multipart/form-data") {
+		return 415;
+	}
+
 	location / {
 		# First attempt to serve request as file, then
 		# as directory, then fall back to displaying a 404.

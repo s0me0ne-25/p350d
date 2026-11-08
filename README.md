@@ -161,6 +161,7 @@ opt/p350/                      → /opt/p350
 etc/
 ├── systemd/system/            p350d.service, p350d-log@.service
 ├── nginx/sites-available/     p350d site
+├── php/7.4/fpm/conf.d/        PHP-FPM hardening settings
 ├── sudoers.d/p350d            lets the daemon power the Pi off
 └── cron.d/p350d               periodic restart of the log collectors
 third_party/
@@ -217,14 +218,16 @@ All commands below run on the Pi from a clone of this repository.
    sudo install -m 0644 etc/cron.d/p350d /etc/cron.d/p350d
    ```
 
-6. **Web server.** Install the p350d site, disable the default site, and
-   reload nginx:
+6. **Web server.** Install the p350d site and the PHP hardening settings,
+   disable the default site, and reload nginx and PHP-FPM:
 
    ```sh
    sudo cp etc/nginx/sites-available/p350d /etc/nginx/sites-available/
    sudo ln -s /etc/nginx/sites-available/p350d /etc/nginx/sites-enabled/p350d
    sudo rm /etc/nginx/sites-enabled/default
+   sudo install -m 0644 etc/php/7.4/fpm/conf.d/99-p350d-hardening.ini /etc/php/7.4/fpm/conf.d/
    sudo nginx -t && sudo systemctl reload nginx
+   sudo systemctl restart php7.4-fpm
    ```
 
 7. **Firmware.** Flash both Arduinos:
@@ -260,6 +263,13 @@ All commands below run on the Pi from a clone of this repository.
 > it can send pages, turn off the transmitter and clear the queues. Keep the
 > station on a trusted network, or enable HTTP basic authentication in nginx
 > (`auth_basic` / `auth_basic_user_file`).
+
+> **PHP 7.4** no longer receives security fixes. The site and the PHP
+> settings above mitigate the October 2026 PHP vulnerabilities
+> CVE-2026-109618, CVE-2026-109619 and CVE-2026-115560: session upload
+> progress is disabled in PHP-FPM, and nginx refuses `multipart/form-data`
+> requests and bodies larger than 16 KB before they reach PHP. The web UI
+> needs neither. These are mitigations, not fixes.
 
 ## Configuration
 
