@@ -22,6 +22,13 @@ server {
 		try_files $uri $uri/ =404;
 	}
 
+	# Code shared by the pages (inc_*.php) is only included by them, never
+	# requested directly: pretend it does not exist rather than refuse
+	# with 403. Must stay above the PHP location, which would run it.
+	location ~ /inc_ {
+		return 404;
+	}
+
 	# Pass PHP scripts to PHP-FPM
 	location ~ \.php$ {
 		include snippets/fastcgi-php.conf;

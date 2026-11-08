@@ -1,59 +1,46 @@
 <?php
-	setlocale(LC_CTYPE, "en_US.UTF-8");
-
-	// Station name from the pagerd config. Deliberately simple parser;
-	// any problem (no file, no setting, empty value) gives "Unknown".
-	function getInstallationName() {
-		$config = @file_get_contents(__DIR__ . '/../../pagerd_config.py');
-		if ($config !== false &&
-				preg_match('/^\s*INSTALLATION_NAME\s*=\s*([\'"])(.*?)\1/m', $config, $m) &&
-				$m[2] !== '') {
-			return $m[2];
-		}
-		return 'Unknown';
-	}
+	require_once __DIR__ . '/../inc_common.php';
 
 	if (isset($_GET['ajax'])) {
 		
-		// Handle txstate commands
-		if (isset($_GET['txstate']) && 
-				($_GET['txstate'] == '0') || ($_GET['txstate'] == '1') || ($_GET['txstate'] == 'auto') ) {
-			exec('echo txenable ' . $_GET['txstate'] . ' | nc localhost 16032');
+		// Commands from the page controls. pagerd's replies are not needed.
+		if (isset($_GET['txstate']) && in_array($_GET['txstate'], ['0', '1', 'auto'], true)) {
+			pagerdCommand('txenable ' . $_GET['txstate']);
 		}
-		
-		// Handle clearing commands
 		if (isset($_GET['clrq'])) {
-			exec('echo clrq | nc localhost 16032');
+			pagerdCommand('clrq');
 		}
 		if (isset($_GET['clra'])) {
-			exec('echo clra | nc localhost 16032');
+			pagerdCommand('clra');
+		}
+		if (isset($_GET['silent_restart']) && in_array($_GET['silent_restart'], ['0', '1'], true)) {
+			pagerdCommand('silent-restart ' . $_GET['silent_restart']);
 		}
 		
-		// Handle txstate commands
-		if (isset($_GET['silent_restart']) && 
-				($_GET['silent_restart'] == '0') || ($_GET['silent_restart'] == '1') ) {
-			exec('echo silent-restart ' . $_GET['silent_restart'] . ' | nc localhost 16032');
+		// First get power data and parse it. If pagerd does not answer,
+		// the reply carries empty values, as it always did, plus the log.
+		$response = json_decode((string)pagerdCommand('jps'), true);
+		if (!is_array($response)) {
+			$response = [];
 		}
-		
-		// First get power data and parse it
-		$response = exec('echo jps | nc localhost 16032');
-		$response = json_decode($response, true);
 		
 		// Get persistent config
-		$pconf = exec('echo get-pconf | nc localhost 16032');
-		$pconf = json_decode($pconf, true);
+		$pconf = json_decode((string)pagerdCommand('get-pconf'), true);
+		if (!is_array($pconf)) {
+			$pconf = [];
+		}
 		
 		// Add pconf data to response
-		$response['silent_restart'] = $pconf['silent_restart'];
+		$response['silent_restart'] = $pconf['silent_restart'] ?? null;
 
 		$qsize = 0;
-		if (is_countable($pconf['qmsg_mem'])) {
+		if (is_countable($pconf['qmsg_mem'] ?? null)) {
 			$qsize = count($pconf['qmsg_mem']) - 1;	// Subtracting 1 to exclude digest
 		}
 		$response['qsize'] = $qsize;
 		
 		$asize = 0;
-		if (is_countable($pconf['emerman']['archive'])) {
+		if (is_countable($pconf['emerman']['archive'] ?? null)) {
 			$asize = count($pconf['emerman']['archive']);
 		}
 		$response['asize'] = $asize;
@@ -74,30 +61,12 @@
 		// Output
 		die(json_encode($response));
 	}
-?>
-<!doctype html>
-<html lang=en>
-<head>
-<meta charset=utf-8>
-<title><?php echo htmlspecialchars(getInstallationName()); ?></title>
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="manifest" href="/site.webmanifest">
-<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-<meta name="msapplication-TileColor" content="#90c73d">
-<meta name="msapplication-TileImage" content="/mstile-144x144.png">
-<meta name="theme-color" content="#ffffff">
-<script type="text/javascript" src="/gauge.min.js"></script>
-<link rel="stylesheet" href="/p350.css">
 
-<script type="text/javascript" src="/admin/p350_admin.js"></script>
-</head>
-<body class="page_admin" onload="init()">
-<center>
-<img src="/logo.png" width="400px"/>
-<h3><i>Административный интерфейс</i></h3>
+	$pageClass = 'page_admin';
+	$pageScripts = ['/gauge.min.js', '/admin/p350_admin.js'];
+	$pageSubtitle = 'Административный интерфейс';
+	require_once __DIR__ . '/../inc_header.php';
+?>
 
 <div class="pager_body">
 	<table>
@@ -117,7 +86,7 @@
 					</table>
 				</td>
 				<td class="indicators">
-					<div class="led" id="act_led"></div
+					<div class="led" id="act_led"></div>
 				</td>
 			</tr>
 			<tr valign="top">
@@ -130,7 +99,7 @@
 							<img class="power_icon pi_right" id="ac" src="/ac.svg">
 							<div class="power_icon pi_left pi_overlay"></div>
 							<div class="power_icon pi_right pi_overlay"></div>
-							<canvas id="voltmeter" class="meter_panel" />
+							<canvas id="voltmeter" class="meter_panel"></canvas>
 						</td></tr>	
 						<tr class="spacer">
 							<td align="right" class="label_small">ПИТАНИЕ</td>
@@ -192,7 +161,5 @@
 				</td>
 	</tr>
 	</tbody></table>
-</form>
-</center>
-</body>
-</html>
+</div>
+<?php require_once __DIR__ . '/../inc_footer.php'; ?>
