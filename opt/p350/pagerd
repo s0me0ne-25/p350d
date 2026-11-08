@@ -10,27 +10,27 @@ def debug(text, newline=True, timestamp=True):
     print (timestamp + text, flush=True, end=endchar)
 
 ## CONFIG
-SERIAL = '/dev/ttyAMA0'
+SERIAL = '/dev/ttyAMA0'         # Serial port the POCSAG modulator is connected to
 
 BAUD_RATE = 512                 # TX baud rate: 512, 1200 or 2400
 
-CAPCODE = 1234567               # For real messages
-CAPCODE_BACKGROUND = 1765432    # -------//--------
-MSGTYPE = 3                     # -------//--------
-DUMMY_CAPCODE = 1111111         # For sending keepalives
-DUMMY_MSGTYPE = 0               # ----------//----------
+CAPCODE = 1234567               # For real messages (urgent)
+CAPCODE_BACKGROUND = 1765432    # For real messages (background digests)
+MSGTYPE = 3                     # Message type a.k.a. POCSAG func bits a.k.a. CC extension (for both above)
 
-PING_INTERVAL = 120      # Seconds
+DUMMY_CAPCODE = 1111111         # Keepalives are minimal valid POCSAG traffic addressed to nobody
+DUMMY_MSGTYPE = 0               # just to make pagers know they are within coverage. So, totally made up CC/FB here
 
-RETX_COUNT = 50
-RETX_STEP = 1           # ReTX every N ping intervals
-RETX_COOLDOWN = 40      # Transmitter cooldown between retxed messages
+PING_INTERVAL = 120             # Interval to send digests and keepalives, as well as retransmit (see below)
 
-REPEAT = 3              # Repeat every message N times (1...10)
-                        # under one preamble to improve reception
+RETX_COUNT = 50                 # Retransmit messages N times in addition to the initial transmission
+                                # to improve reception chances
+RETX_STEP = 1                   # Retransmit every N ping intervals
+RETX_COOLDOWN = 40              # Transmitter cooldown between retxed messages
 
-TX_TOT_LIMIT = 10       # Seconds. REPEATs are limited by this for
-                        # every message processed
+REPEAT = 3                      # Repeat every message N times (1...10) under one preamble to improve reception
+
+TX_TOT_LIMIT = 10               # Seconds. REPEATs are limited by this for every message processed
 
 PREKEY_MS = 100                 # Milliseconds. Delay between transmitter keying and message start
 POSTKEY_MS = 100                # Milliseconds. Delay between message end and transmitter dekeying
@@ -106,7 +106,7 @@ class RepeatTimer(Timer):
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
-            
+
 class P350dEncoder(json.JSONEncoder):
     def default(self, z):
         if isinstance(z, Message):
@@ -136,21 +136,21 @@ class P350dEncoder(json.JSONEncoder):
             })
         elif isinstance(z, datetime):
             return z.isoformat()
-            
+
         else:
             super().default(self, z)
-            
+
 def safeParseIsoformat(iso):
     if (iso == None):
         return None
-        
+
     try:
         d = datetime.fromisoformat(iso)
     except:
         d = None
-    
-    return d        
-    
+
+    return d
+
 def decode_p350d_types(z):
     if ('__Message__' in z):
         return Message(
@@ -173,10 +173,10 @@ def decode_p350d_types(z):
         buf.archive = z['archive']
         buf.strikes = z['strikes']
         return buf
-        
+
     # add types above
     return z
-            
+
 class Message(object):
 
     def __init__(self, capcode, msgtype, text, retx_max = 0, retx_count = 0):
@@ -185,27 +185,27 @@ class Message(object):
         self.text = self.delUnsafeChars(text)
         self.retx_max = retx_max
         self.retx_count = retx_count
-        
+
     def delUnsafeChars(self, s):
         return ' '.join(s.splitlines()).strip()
-        
+
     def needsRetx(self):
         return (self.retx_count < self.retx_max)
-        
+
     def incRetxCount(self):
         self.retx_count += 1
-        
+
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
 
 class Emergency(object):
 
     EMG_CODES = 3   # Number of codes below
-    
+
     POWER_LOSS = 0
     NETWORK_LOSS = 1
     RED_BUTTON = 2
-    
+
     startTexts = [
         "НЕТ 220 БАТ=%v",
         "НЕТ СЕТИ",
@@ -217,7 +217,7 @@ class Emergency(object):
         "СЕТЬ ОК",
         "СБРОС КНОПКИ"
     ]
-    
+
     archiveTexts = [
        "НЕТ 220",
        "НЕТ СЕТИ",
@@ -230,13 +230,13 @@ class Emergency(object):
         self.end = None
         self.resolved = False
         self.text = Emergency.startTexts[code]
-    
+
     def substVars(self, text):
         global voltage
         text = text.replace("%v", str(floatVoltage()))
-        
+
         return text
-        
+
     def resolve(self):
         self.end = datetime.now()
         self.resolved = True
@@ -246,43 +246,43 @@ class Emergency(object):
         timestampPrefix = "<" if (dtSec <= 60) else self.start.strftime('<%H:%M-')
         self.text = timestampPrefix + self.end.strftime('%H:%M> ') + self.archiveTexts[self.code]
         return self.substVars(Emergency.endTexts[self.code])
-        
+
     def getText(self):
         return self.substVars(self.text)
-    
-        
+
+
 class EmergencyManager(object):
-    
+
     MAX_STRIKES = 60
-    
+
     ARCHIVE_EMPTY = "НЕТ ТРЕВОГ"
     #ARCHIVE_NONEMPTY = "АРХИВ ТРЕВОГ: "
-    
+
     def __init__(self):
         self.emergs = [None]*Emergency.EMG_CODES
         self.strikes = [0]*Emergency.EMG_CODES
         self.archive = []
-                
+
     def timestamp(self, dt=None):
         if (dt == None):
             dt = datetime.now()
 
         return dt.strftime("<%H:%M> ")
-        
+
     def substVars(self, text):
         global voltage
         text = text.replace("%v", str(floatVoltage()))
-        
+
         return text
-        
+
     def emergStart(self, emgCode, maxStrikes = -1):
         if (self.emergs[emgCode] == None):
-        
+
             if (maxStrikes == -1):
                 maxStrikes = EmergencyManager.MAX_STRIKES
-            
+
             debug("emergStart(): code=" + str(emgCode) + ", strikes=" + str(self.strikes[emgCode]), False, True)
-            
+
             if (self.strikes[emgCode] < maxStrikes - 1):
                 debug(", strikes incremented", True, False)
                 self.strikes[emgCode] += 1
@@ -295,10 +295,10 @@ class EmergencyManager(object):
                 pconf.save()
 
                 return Message(CAPCODE, MSGTYPE, msg, 0)
-        
+
     def emergEnd(self, emgCode):
         self.strikes[emgCode] = 0
-        
+
         if isinstance(self.emergs[emgCode], Emergency):
             debug("emergEnd(): code=" + str(emgCode))
 
@@ -309,26 +309,26 @@ class EmergencyManager(object):
             self.emergs[emgCode] = None
 
             pconf.save()
-            
+
             return Message(CAPCODE, MSGTYPE, msg, 0)
-        
+
     def getDigest(self):
         digest = ""
-        
+
         for emg in self.emergs:
             if isinstance(emg, Emergency):
                 digest += (self.timestamp(emg.start) + emg.getText() + " / ")
-                
+
         if digest == "":
             return None
-            
+
         digest = digest[:-3]
         #return Message(CAPCODE, MSGTYPE, self.timestamp(emg.start) + digest, 1)
         return Message(CAPCODE, MSGTYPE, digest, 1)
-        
+
     def getArchiveDigest(self, maxAgeSec = 86400, purgeOld = True):
         digest = ""
-        
+
         d = datetime.now()
         wasPurge = False
         for emg in self.archive[:]:
@@ -337,13 +337,13 @@ class EmergencyManager(object):
             elif purgeOld:
                 self.archive.remove(emg)
                 wasPurge = True
-                
+
         if wasPurge:
             pconf.save()
-                                            
+
         #return EmergencyManager.ARCHIVE_EMPTY if (digest == "") else (EmergencyManager.ARCHIVE_NONEMPTY + (digest[:-3]))
         return EmergencyManager.ARCHIVE_EMPTY if (digest == "") else (digest[:-3])
-        
+
 class PocsagSerial(serial.Serial):
 
     def __init__(self, port):
@@ -352,33 +352,33 @@ class PocsagSerial(serial.Serial):
         self.port = port
         self.timeout = 0.5
         self.txEnabled = True
-        
+
     def start(self):
         retries = 0
         debug('Opening ' + SERIAL)
-        
+
         while not self.is_open:
             try:
                 self.open()
             except:
                 time.sleep(0.2)
                 retries += 1
-                
+
         debug('Opened ' + SERIAL + ' in ' + str(retries) + ' retries')
-        
+
     def end(self):
         retries = 0
         debug('Closing ' + SERIAL)
-        
+
         while self.is_open:
             try:
                 self.close()
             except:
                 time.sleep(0.2)
                 retries += 1
-                
+
         debug('Closed ' + SERIAL + ' in ' + str(retries) + ' retries')
-        
+
     def safeWrite(self, data):
         if not self.txEnabled:
             debug('Transmitter is disabled.')
@@ -391,17 +391,17 @@ class PocsagSerial(serial.Serial):
         self.flush()
         #retCode = self.read(2)[:-1].decode('ascii')
         #debug("; response = " + retCode, True, False)
-        
+
 class PersistConfig(object):
     TX_STATE = 'txenable'
     TX_DISABLED = 0
     TX_ENABLED = 1
     TX_AUTO = 2
-    
+
     SILENT_RESTART = 'silent_restart'
     QMSG_MEM = 'qmsg_mem'
     EMERMAN = 'emerman'
-    
+
     def __init__ (self, filename):
         self.config = {
             PersistConfig.TX_STATE: PersistConfig.TX_AUTO,
@@ -410,9 +410,9 @@ class PersistConfig(object):
             PersistConfig.EMERMAN: EmergencyManager()
         }
         self.filename = filename
-        
+
         self.load()
-        
+
     def load(self):
         try:
             with open(self.filename, "r") as f:
@@ -430,7 +430,7 @@ class PersistConfig(object):
                 debug("Broken PConf moved to " + broken)
             except Exception:
                 pass
-            
+
     def save(self):
         # Atomic write: temp file -> fsync -> rename.
         # The old pconf.json stays intact until the new one is fully on disk,
@@ -449,20 +449,20 @@ class PersistConfig(object):
                 os.close(dirfd)
         except Exception as e:
             debug("PConf save failed (" + repr(e) + ")")
-                      
+
 MSG_PING = Message(DUMMY_CAPCODE, DUMMY_MSGTYPE, "")
 
 retxCounter = 0
-     
+
 workdir = os.path.dirname(sys.argv[0])
 os.chdir(workdir)
 
 voltdrop_buf = []
 voltdrop_measuring=False
 voltdrop_printed=True
-   
+
 i2clib = CDLL('./i2clcd.so')
-   
+
 LINE1 = 0x80 # 1st line
 LINE2 = 0xC0 # 2nd line
 
@@ -507,17 +507,17 @@ def getLock(lock):
     global locks
     while locks[lock]:
         time.sleep (0.1)
-        
+
     locks[lock] = True
-    
+
 def releaseLock(lock):
     global locks
     time.sleep(0.1)
     locks[lock] = False
-    
+
 def measureVoltdrop():
     global voltage, voltdrop_buf, voltdrop_measuring, voltdrop_printed, lastTxDrop
-    
+
     if voltdrop_measuring:
         voltdrop_printed = False
         voltdrop_buf.append(floatVoltage())
@@ -530,69 +530,69 @@ def measureVoltdrop():
 def floatVoltage():
     global voltage
     return float(voltage[:-1])
-    
+
 def getVoltage():
     global voltage
-    
+
     COMMAND_GETVOLTAGE = 0x01
-    
+
     data = i2clib.queryDuino(COMMAND_GETVOLTAGE)
     if (not data == -1):
         vtemp = str(data / 10.0) + "V"
     else:
         debug('getVoltage failed')
         return
-        
+
     voltage = vtemp
-    
+
 def getPwrState():
     global powerState
-    
+
     COMMAND_GETPWRSTATE = 0x02
-    
+
     data = i2clib.queryDuino(COMMAND_GETPWRSTATE)
     if (data == -1):
         debug('getPwrState failed')
         return
-        
+
     powerState = data
-            
+
 def printVoltage():
     iconString = ""
     iconString += (ICON_NETWORK_OK if networkOk else ICON_NETWORK_FAIL)
-    
+
     powerIcon = ICON_220V if (powerState == PWRSTATE_AC) else ICON_BATT
     printLcd(1, str.ljust(powerIcon + voltage, 8) + str.rjust(iconString, 8))
-    
+
 def printIdle():
     global l2idle
     global lastTx
-        
+
     if (l2idle):
         if (pocsag.txEnabled):
             sec_remaining = PING_INTERVAL - (datetime.now() - lastTx).seconds
             if (sec_remaining < 0):
                 sec_remaining = 0
-                    
+
             mins = str(sec_remaining // 60).zfill(2)
             secs = str(sec_remaining % 60).zfill(2)
-                
+
             printLcd(2, "Schd TX in " + mins + ':' + secs)
         else:
             printLcd(2, "TX DISABLED")
-            
+
 def processSensors():
     global rx
-    
+
     while rx.ready():
         remote_msg = rx.get()
         debug("From sensor: %s" % json.dumps(remote_msg))
-        
+
 def processEmergencies():
     global powerState, networkOk, redButtonActive
-    
+
     msgs = []
-    
+
     if (not powerState == PWRSTATE_AC):
         msgs.append(emerman.emergStart(Emergency.POWER_LOSS, maxStrikes=10))
     else:
@@ -602,22 +602,22 @@ def processEmergencies():
         msgs.append(emerman.emergStart(Emergency.NETWORK_LOSS))
     else:
         msgs.append(emerman.emergEnd(Emergency.NETWORK_LOSS))
-        
+
     if (redButtonActive):
         msgs.append(emerman.emergStart(Emergency.RED_BUTTON, maxStrikes=8))
     else:
         msgs.append(emerman.emergEnd(Emergency.RED_BUTTON))
-    
-    for msg in msgs:    
+
+    for msg in msgs:
         if not msg == None:
             pageMsg(msg)
             time.sleep(10)
-            
+
 def setTxState():
     global pconf, THRESHOLD, HYSTER, voltdrop_measuring
-  
+
     txState = pconf.config[PersistConfig.TX_STATE]
-    
+
     if (txState == PersistConfig.TX_AUTO):
         # Unable to process TX_AUTO during active transmission, skipping
         if (voltdrop_measuring):
@@ -628,15 +628,15 @@ def setTxState():
             pocsag.txEnabled = False
         elif volt >= (THRESHOLD + HYSTER):
             pocsag.txEnabled = True
-            
+
     else:
         pocsag.txEnabled = (txState == PersistConfig.TX_ENABLED)
-               
-    
-        
+
+
+
 def processPeripherals(sayBye=False):
     global dispLines, i2clib
-    
+
     if sayBye:
         dispLines[0] = datetime.now().strftime("STOPPED %H:%M")
         dispLines[1] = "BYE"
@@ -648,27 +648,27 @@ def processPeripherals(sayBye=False):
         printVoltage()
         setTxState()
         printIdle()
-        
+
         measureVoltdrop()
-        
+
         redButton()
         poweroffSwitch()
-        
+
     i2clib.lcdLoc(LINE1)
     i2clib.typeln(bytes(dispLines[0].ljust(16), 'ascii'))
     i2clib.lcdLoc(LINE2)
     i2clib.typeln(bytes(dispLines[1].ljust(16), 'ascii'))
-    
+
 def checkNetwork():
     global networkOk
-    
+
     result = False
     try:
         cp = subprocess.run(["./checknet.sh", "-w3", "-n", "8.8.8.8"], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = (cp.returncode == 0)
     except:
         debug ("checkNetwork() failed")
-        
+
     networkOk = result
 
 def printLcd(line, text):
@@ -681,19 +681,19 @@ def koi7encode(text):
         text = text.replace('Ё', 'Е')
         text = text.replace('Ъ', "'")
         text = text.replace('ъ', "'")
-        
+
         koi8r = bytes(text,'koi8-r','replace')
-        
+
         koi7=''
         for c in koi8r:
                 koi7 += chr(c & 127)
-                
+
         return koi7
 
 def init_encoder():
     for cmd in ENCODER_INIT:
         pocsag.safeWrite(cmd)
-    
+
 def tx(msg, dispStatus):
     global lastTx, l2idle, voltdrop_measuring
 
@@ -749,14 +749,14 @@ def print_idle():
     global l2idle, voltdrop_measuring
     l2idle = True
     voltdrop_measuring = False
-    
+
 def print_idle_async():
     #global lastTx
     #print_idle = lambda: printLcd(2, "Last TX: " + lastTx.strftime("%H:%M"))
-        
+
     timer = Timer(5, print_idle)
     timer.start()
-    
+
 
 def page(text):
     msg = Message(CAPCODE, MSGTYPE, text, RETX_COUNT)
@@ -767,33 +767,33 @@ def pageMsg(msg):
 
     tx(msg, "TX > " + str(CAPCODE))
     debug('Paged text: ' + msg.text + ' (CC=' + str(msg.capcode) + ' type=' + str(msg.msgtype) + ')')
-    
+
     if msg.needsRetx():
         #msgq.append(msg)
         pconf.config[PersistConfig.QMSG_MEM].append(msg)
         pconf.save()
-        
+
 def ping():
     tx(MSG_PING, "TX ping")
     debug('Sent ping')
-    
+
 def buildBackgroundDigest():
     digest = emerman.getArchiveDigest()
     prefix = "СВОДКА" if (digest == EmergencyManager.ARCHIVE_EMPTY) else "АРХИВ"
-    
+
     digest = prefix + datetime.now().strftime(" <%H:%M> / ") + digest
-    
+
     return Message(CAPCODE_BACKGROUND, MSGTYPE, digest, 1)
-    
+
 def sendq():
     #global msgq
     global retxCounter
     global emerman
-    
+
     emer_digest = emerman.getDigest()
     if (not emer_digest == None):
         pconf.config[PersistConfig.QMSG_MEM].insert(0, emer_digest)
-        
+
     pconf.config[PersistConfig.QMSG_MEM].append(buildBackgroundDigest())
 
     wasTx = False
@@ -808,37 +808,37 @@ def sendq():
             else:
                 pconf.config[PersistConfig.QMSG_MEM].remove(msg)
                 debug ("Fully retxed: " + msg.text + ", removed")
-                
+
         pconf.save()
 
     if not wasTx:
            ping()
-           
+
     retxCounter = (retxCounter + 1) % RETX_STEP
-    
+
 def clrq():
     if (len(pconf.config[PersistConfig.QMSG_MEM]) > 1):     # Excluding digest
         for msg in pconf.config[PersistConfig.QMSG_MEM][:]:
             if (msg.capcode == CAPCODE):
                 pconf.config[PersistConfig.QMSG_MEM].remove(msg)
                 debug ("Removed by clrq(): " + msg.text)
-                    
+
         pconf.save()
-    
+
 def setPingTimer():
     global pingTimer
 
     if not 'pingTimer' in globals():
         pingTimer = RepeatTimer(PING_INTERVAL, sendq)
-        
+
     try:
         pingTimer.cancel()
     finally:
         pingTimer = RepeatTimer(PING_INTERVAL, sendq)
         pingTimer.start()
-        
+
     debug('Ping timer is reset, next=' + (datetime.now() + timedelta(seconds=PING_INTERVAL)).strftime("%H:%M:%S"))
-    
+
 class ControlHandler(socketserver.BaseRequestHandler):
     def handle(self):
         global pocsag, redButtonActive, THRESHOLD, HYSTER
@@ -851,15 +851,15 @@ class ControlHandler(socketserver.BaseRequestHandler):
             cmd = cmdArray[0]
         except:
             cmd = ''
-            
+
         try:
             args = cmdArray[1]
         except:
             args = ''
-        
+
 #        debug('CMD = ' + cmd)
 #        debug('ARGS = ' + args)
-        
+
         response = ''
         if cmd == 'page':
             msg = args.strip()
@@ -867,7 +867,7 @@ class ControlHandler(socketserver.BaseRequestHandler):
                 response = 'No message text specified'
             else:
                 page(args)
-            
+
         elif cmd == 'power':
             response += 'Voltage: ' + str(voltage) + '\n'
             supply = "Mains" if (powerState == PWRSTATE_AC) else "Battery"
@@ -875,7 +875,7 @@ class ControlHandler(socketserver.BaseRequestHandler):
             response += 'Low battery threshold: ' + str(THRESHOLD) + 'V\n'
             response += 'Threshold hysteresis: ±' + str(HYSTER) + 'V\n'
             response += 'Voltage drop on last TX: ' + lastTxDrop
-            
+
         elif cmd == 'txenable':
             state = args.strip()
             if state == '1':
@@ -916,10 +916,10 @@ class ControlHandler(socketserver.BaseRequestHandler):
                 debug(response)
             else:
                 response = 'Usage: silent-restart <0|1>'
-            
+
             pconf.config[PersistConfig.SILENT_RESTART] = (state == '1')
             pconf.save()
-            
+
         # elif cmd == 'red-button':
             # state = args.strip()
             # if state == '1':
@@ -932,22 +932,22 @@ class ControlHandler(socketserver.BaseRequestHandler):
                 # redButtonActive = False
             # else:
                 # response = 'Usage: red-button <0|1>'
-                                     
+
         elif cmd == 'get-pconf':
             response = json.dumps(pconf.config, separators=(',', ':'), cls=P350dEncoder)
-            
+
         elif cmd == 'clrq':
             clrq()
             response = "Retx queue cleared"
-            
+
         elif cmd == 'clra':
             emerman.getArchiveDigest(maxAgeSec=0, purgeOld=True)
             response = "Emergencies archive cleared"
             debug(response)
-                     
+
         elif cmd == 'help':
             response = """P350 POCSAG transmitter control system
-            
+
 Supported commands:
 - page <text> -- Pages a message
 - power -- Get transmitter power state
@@ -962,42 +962,42 @@ Supported commands:
         else:
             response = 'Unknown command ' + cmd
             debug(response)
-            
+
         self.request.sendall(str.encode(response + '\n'))
-        
+
 def serverThread():
     global server
     socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer(('127.0.0.1', CONTROL_PORT), ControlHandler)
     server.serve_forever()
-    
+
 def poweroffSwitch(channel=None):
     if (not GPIO.input(GPIO_POWER_SWITCH)): # Power switch sets the pin to 0 in OFF position
         response = 'SHUTTING DOWN PAGING SERVER NOW'
         debug(response)
         processPeripherals(sayBye=True)
         subprocess.run(["/usr/bin/sudo", "/usr/sbin/poweroff"], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
+
 def redButton(channel=None):
     global redButtonActive
     newState = not GPIO.input(GPIO_RED_BUTTON)
-    
+
     if (newState == redButtonActive):
         return  # Nothing changed
-        
+
     debug("redButton(): pin=" + str(GPIO.input(GPIO_RED_BUTTON)))
     redButtonActive = newState
-    
+
 def handle_exit(*args):
     global isTerminated
     global server
     global dispTimers
     global pingTimer
-    
+
     if isTerminated:
         return          # Already terminated
     isTerminated = True
-    
+
     debug('Received termination command')
 
     # Page the stop message first. On OS shutdown pigpiod may already be
@@ -1016,19 +1016,19 @@ def handle_exit(*args):
         debug('pigpio cleanup failed (' + repr(e) + ')')
 
     for timer in dispTimers:
-        timer.cancel()     
-    try:    
+        timer.cancel()
+    try:
         pingTimer.cancel()
     except:
         pass
-        
+
     processPeripherals(sayBye=True)
-     
+
     server.shutdown()
     pocsag.end()
     GPIO.cleanup()
     raise(SystemExit)
-    
+
 ## Main
 i2clib.init()
 pocsag.start()
@@ -1045,14 +1045,14 @@ rx.set_this_address(DEVICE_ADDRESS)
 processPeripherals()
 
 dispTimers = []
-dispTimers.append(RepeatTimer(0.5, processEmergencies)) 
-dispTimers.append(RepeatTimer(0.5, processPeripherals)) 
-dispTimers.append(RepeatTimer(0.5, processSensors)) 
+dispTimers.append(RepeatTimer(0.5, processEmergencies))
+dispTimers.append(RepeatTimer(0.5, processPeripherals))
+dispTimers.append(RepeatTimer(0.5, processSensors))
 dispTimers.append(RepeatTimer(5, checkNetwork))
 
 for timer in dispTimers:
     timer.start()
-    
+
 threading.Thread(target=serverThread).start()
 debug('Server started')
 
